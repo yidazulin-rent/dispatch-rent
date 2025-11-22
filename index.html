@@ -1,699 +1,388 @@
 <!DOCTYPE html>
-<!--
-  派車簽認單模板生成器
-
-  這個頁面是一個純前端的派車簽認單產生器，
-  使用者可以在左側表單輸入派車資料，右側即時顯示在背景模板上。
-
-  右側採用絕對定位覆蓋方式，以便將資料精準放置在底圖的指定位置。
-  使用者可以透過「切換欄位調整模式」按鈕來拖曳每個欄位，
-  調整到理想位置後再關閉，系統會把座標存到 localStorage。
-
-  **公司標題與底部連絡電話**
-  -------------------------------------------------------------
-  因為實際公司名稱與電話不方便公開，你可以在本檔案頂部的
-  `CONFIG` 區域自訂這些值（例如 companyHeader, phoneFooter 等），
-  以便套用在單據最上方的公司標題與底部電話。
-
-  開發時只需要修改程式碼，不必改其他檔案。
--->
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>派車簽認單模板生成器</title>
+  <meta charset="UTF-8" />
+  <title>派車簽單生成</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
-      font-family: "Microsoft JhengHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 12px;
-    }
-    h1 {
-      font-size: 18px;
-      margin-bottom: 8px;
+      font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont;
+      background:#f5f5f5;
+      margin:0;
+      padding:16px;
     }
     .container {
-      display: flex;
-      gap: 20px;
-      align-items: flex-start;
+      max-width:900px;
+      margin:0 auto;
+      background:#fff;
+      padding:16px 16px 32px;
+      border-radius:8px;
+      box-shadow:0 2px 8px rgba(0,0,0,.1);
     }
-
-    /* 左側輸入表單 */
-    form {
-      width: 360px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 13px;
+    h1{
+      text-align:center;
+      margin-top:0;
+      font-size:24px;
     }
-    form h2 {
-      font-size: 15px;
-      margin: 0 0 6px 0;
+    form{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      font-size:16px;
     }
-    label {
-      display: block;
-      margin-top: 6px;
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    label{
+      font-weight:bold;
     }
     input[type="text"],
     input[type="tel"],
     input[type="date"],
     input[type="time"],
-    input[type="number"],
-    select,
-    textarea {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 4px 6px;
-      margin-top: 2px;
-      font-size: 13px;
+    input[type="number"]{
+      font-size:18px;
+      padding:6px 8px;
+      border:1px solid #ccc;
+      border-radius:4px;
+      width:100%;
+      box-sizing:border-box;
     }
-    textarea {
-      resize: vertical;
-      min-height: 40px;
+    .row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
     }
-    .inline {
-      display: flex;
-      gap: 8px;
+    .row > .field{
+      flex:1 1 150px;
     }
-    .inline > div {
-      flex: 1;
+    .options{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      font-size:18px;
     }
-    button {
-      margin-top: 8px;
-      padding: 6px 10px;
-      font-size: 13px;
-      cursor: pointer;
+    .options label{
+      font-weight:normal;
     }
-
-    /* 右側簽認單區域 */
-    .sheet-wrapper {
-      flex: 1;
-      display: flex;
-      justify-content: center;
+    button{
+      margin-top:8px;
+      padding:10px 16px;
+      font-size:18px;
+      border:none;
+      border-radius:6px;
+      background:#007bff;
+      color:#fff;
+      cursor:pointer;
     }
-    .sheet {
-      position: relative;
-      /* 對應空白簽單模板的實際像素大小（889×634） */
-      width: 889px;
-      height: 634px;
-      border: 1px solid #000;
-      overflow: hidden;
+    button:active{
+      transform:scale(0.98);
     }
 
-    /* 底圖改成 <img>，會跟一般內容一起列印 */
-    .sheet-bg {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: fill;    /* 讓圖剛好撐滿整張單 */
-      z-index: 0;
-      pointer-events: none;
+    /* modal */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.6);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:999;
     }
-
-    /* 共用欄位樣式：單行文字 */
-    .field {
-      position: absolute;
-      font-size: 11px;
-      line-height: 1.2;
-      white-space: nowrap;
-      cursor: default;
-      pointer-events: none; /* 預設不可拖拉 */
-      z-index: 1;
+    .modal{
+      background:#fff;
+      max-width:95vw;
+      max-height:95vh;
+      padding:8px 8px 16px;
+      border-radius:8px;
+      box-sizing:border-box;
+      text-align:center;
     }
-    /* 多行欄位：備註用 */
-    .field-multi {
-      position: absolute;
-      font-size: 11px;
-      line-height: 1.3;
-      white-space: normal;
-      cursor: default;
-      pointer-events: none;
+    .modal img{
+      max-width:100%;
+      height:auto;
     }
-
-    /* 編輯模式下：欄位可以拖曳、調整尺寸並顯示輔助線 */
-    .editable .field,
-    .editable .field-multi {
-      pointer-events: auto;
-      cursor: move;
-      outline: 1px dashed rgba(255,0,0,0.7);
-      background-color: rgba(255,255,255,0.5);
-      /* 允許拉伸大小：雙向調整 */
-      resize: both;
-      overflow: hidden;
+    .modal button{
+      margin-top:8px;
+      background:#444;
     }
-
-    /* 列印設定 */
-    @page {
-      size: A5 landscape;
-      margin: 5mm;
-    }
-    @media print {
-      body { margin: 0; }
-      form, h1, #toggleEditBtn, #clearPosBtn {
-        display: none;
-      }
-      .sheet {
-        border: none;
-      }
+    .hint{
+      font-size:13px;
+      color:#555;
+      margin-top:4px;
+      text-align:center;
+      line-height:1.4;
     }
   </style>
 </head>
 <body>
-  <h1>派車簽認單模板生成器</h1>
+<div class="container">
+  <h1>派車、簽認單生成</h1>
 
-  <div class="container">
-    <!-- 左側表單 -->
-    <form id="inputForm">
-      <h2>輸入資料</h2>
+  <form id="dispatchForm">
+    <!-- 0. 公司抬頭 -->
+    <div class="field">
+      <label for="companyTitle">公司抬頭（上方：ＯＯ租賃有限公司）</label>
+      <input id="companyTitle" type="text" value="ＯＯ租賃有限公司" />
+    </div>
 
-      <label>公司（訂車公司）
-        <input type="text" id="in-company">
-      </label>
+    <!-- 1. 客戶公司 -->
+    <div class="field">
+      <label for="clientCompany">客戶公司</label>
+      <input id="clientCompany" type="text" placeholder="例如：○○旅行社" />
+    </div>
 
-      <label>乘客姓名
-        <input type="text" id="in-passenger">
-      </label>
+    <!-- 2. 日期 -->
+    <div class="field">
+      <label for="date">日期</label>
+      <input id="date" type="date" />
+      <div class="hint">會自動轉成「X月X日」印在右上角</div>
+    </div>
 
-      <label>乘客電話
-        <input type="tel" id="in-phone">
-      </label>
-
-      <div class="inline">
-        <div>
-          <label>日期
-            <input type="date" id="in-date">
-          </label>
-        </div>
-        <div>
-          <label>派車種類
-            <select id="in-type">
-              <option value="send">送機</option>
-              <option value="pick">接機</option>
-              <option value="charter">包車</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <label>起點
-        <input type="text" id="in-start">
-      </label>
-
-      <label>終點
-        <input type="text" id="in-end">
-      </label>
-
-      <label>金額
-        <input type="text" id="in-price" placeholder="例：$1,200">
-      </label>
-
-      <div class="inline">
-        <div>
-          <label>開始時間（24H）
-            <!-- 直接輸入 24 小時制，例如 05:30 或 18:20 -->
-            <input
-              type="text"
-              id="in-time-start"
-              placeholder="例如 05:30"
-              inputmode="numeric"
-              pattern="^([01]\d|2[0-3]):[0-5]\d$">
-          </label>
-        </div>
-        <div>
-          <label>結束時間（24H）
-            <input
-              type="text"
-              id="in-time-end"
-              placeholder="例如 18:20"
-              inputmode="numeric"
-              pattern="^([01]\d|2[0-3]):[0-5]\d$">
-          </label>
-        </div>
-      </div>
-
-      <div class="inline">
-        <div>
-          <label>包車小時數
-            <input type="number" id="in-hours" min="0">
-          </label>
-        </div>
-        <div>
-          <label>包車分鐘數
-            <input type="number" id="in-minutes" min="0" max="59">
-          </label>
-        </div>
-      </div>
-
-      <label>車型選擇
-        <select id="in-car-type">
-          <option value="">（不勾選）</option>
-          <option value="sedan">轎車</option>
-          <option value="van">休旅車</option>
-          <option value="other">其他</option>
-        </select>
-      </label>
-
-      <label>車型「其他」文字
-        <input type="text" id="in-car-type-other" placeholder="例如：廂型車">
-      </label>
-
-      <label>人數
-        <input type="number" id="in-people" min="1" value="1">
-      </label>
-
-      <label>是否舉牌接機
-        <select id="in-board-sign">
-          <option value="no">否</option>
-          <option value="yes">是</option>
-        </select>
-      </label>
-
-      <label>駕駛姓名
-        <input type="text" id="in-driver">
-      </label>
-
-      <label>車號
-        <input type="text" id="in-car-no">
-      </label>
-
-      <label>備註（延誤用車、空車單…）
-        <textarea id="in-remark"></textarea>
-      </label>
-
-      <label>底部電話文字
-        <input type="text" id="in-footer-tel" value="(03)459-7769">
-      </label>
-      <label>底部傳真文字
-        <input type="text" id="in-footer-fax" value="(03)459-7103">
-      </label>
-      <label>底部手機文字
-        <input type="text" id="in-footer-mobile" value="0932-028-263">
-      </label>
-
-      <button type="button" onclick="fillToday()">日期填今天</button>
-      <button type="button" onclick="window.print()">列印 / 存 PDF</button>
-      <button type="button" id="toggleEditBtn">切換欄位調整模式</button>
-      <button type="button" id="clearPosBtn">清除欄位位置</button>
-    </form>
-
-    <!-- 右側簽單區 -->
-    <div class="sheet-wrapper">
-      <div class="sheet" id="sheet">
-        <!-- 底圖：改成 <img>，列印時會自動包含 -->
-        <img src="dispatch-template.jpg" alt="" class="sheet-bg">
-
-        <!-- 公司標題（從 config 取得） -->
-        <span class="field" id="f-header-title"></span>
-
-        <!-- 公司、日期、乘客、電話相關欄位 -->
-        <span class="field" id="f-company"></span>
-        <span class="field" id="f-date-month"></span>
-        <span class="field" id="f-date-day"></span>
-        <span class="field" id="f-passenger"></span>
-        <span class="field" id="f-phone"></span>
-
-        <!-- 勾選：派車種類 -->
-        <span class="field" id="f-type-send"></span>
-        <span class="field" id="f-type-pick"></span>
-        <span class="field" id="f-type-charter"></span>
-
-        <!-- 行程區塊：起點、終點、金額 -->
-        <span class="field" id="f-start"></span>
-        <span class="field" id="f-end"></span>
-        <span class="field" id="f-price"></span>
-
-        <!-- 時間區塊：開始時/分、結束時/分，包車時/分 -->
-        <span class="field" id="f-time-start-h"></span>
-        <span class="field" id="f-time-start-m"></span>
-        <span class="field" id="f-time-end-h"></span>
-        <span class="field" id="f-time-end-m"></span>
-        <span class="field" id="f-hours"></span>
-        <span class="field" id="f-minutes"></span>
-
-        <!-- 舉牌接機勾選 -->
-        <span class="field" id="f-board-sign"></span>
-
-        <!-- 車型勾選與其他文字 -->
-        <span class="field" id="f-car-type-sedan"></span>
-        <span class="field" id="f-car-type-van"></span>
-        <span class="field" id="f-car-type-other-v"></span>
-        <span class="field" id="f-car-type-other-text"></span>
-
-        <!-- 人數 -->
-        <span class="field" id="f-people"></span>
-
-        <!-- 駕駛、車號 -->
-        <span class="field" id="f-driver"></span>
-        <span class="field" id="f-car-no"></span>
-
-        <!-- 備註（多行） -->
-        <span class="field-multi" id="f-remark"></span>
-
-        <!-- 底部聯絡方式 -->
-        <span class="field" id="f-footer-tel"></span>
-        <span class="field" id="f-footer-fax"></span>
-        <span class="field" id="f-footer-mobile"></span>
+    <!-- 3. 送機／接機／包車 -->
+    <div class="field">
+      <label>用途</label>
+      <div class="options">
+        <label><input type="radio" name="serviceType" value="song" checked> 送機</label>
+        <label><input type="radio" name="serviceType" value="jie"> 接機</label>
+        <label><input type="radio" name="serviceType" value="bao"> 包車</label>
       </div>
     </div>
+
+    <!-- 4. 開始/班機時間 -->
+    <div class="field">
+      <label for="startTime">開始／班機時間（24H）</label>
+      <input id="startTime" type="time" />
+    </div>
+
+    <!-- 5–8 乘客／電話／起點／終點 -->
+    <div class="row">
+      <div class="field">
+        <label for="passenger">乘客姓名</label>
+        <input id="passenger" type="text" />
+      </div>
+      <div class="field">
+        <label for="phone">乘客電話</label>
+        <input id="phone" type="tel" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="origin">起點</label>
+      <input id="origin" type="text" placeholder="例如：○○飯店" />
+    </div>
+
+    <div class="field">
+      <label for="destination">終點</label>
+      <input id="destination" type="text" placeholder="例如：桃園機場第二航廈" />
+    </div>
+
+    <!-- 9. 是否舉牌 -->
+    <div class="field">
+      <label>是否舉牌接機</label>
+      <div class="options">
+        <label><input id="holdSign" type="checkbox"> 需要舉牌</label>
+      </div>
+    </div>
+
+    <!-- 10. 車型 -->
+    <div class="field">
+      <label>車型</label>
+      <div class="options">
+        <label><input type="radio" name="carType" value="sedan" checked> 轎車</label>
+        <label><input type="radio" name="carType" value="suv"> 休旅車</label>
+        <label><input type="radio" name="carType" value="other"> 其他（九人座）</label>
+      </div>
+    </div>
+
+    <!-- 11. 人數 -->
+    <div class="field">
+      <label for="people">人數</label>
+      <input id="people" type="number" min="1" inputmode="numeric" />
+    </div>
+
+    <!-- 12–13 駕駛／車號 -->
+    <div class="row">
+      <div class="field">
+        <label for="driver">駕駛</label>
+        <input id="driver" type="text" />
+      </div>
+      <div class="field">
+        <label for="carNo">車號</label>
+        <input id="carNo" type="text" />
+      </div>
+    </div>
+
+    <button type="submit">生成簽單圖片</button>
+    <div class="hint">
+      送出後會跳出預覽圖，手機可長按簽單圖片進行儲存或分享。
+    </div>
+  </form>
+</div>
+
+<!-- 模板底圖（不顯示，只給 Canvas 用） -->
+<img id="templateImage" src="dispatch-template.jpg" alt="派車簽認單底圖" style="display:none;" />
+
+<!-- 懸浮視窗 -->
+<div id="modalBackdrop" class="modal-backdrop">
+  <div class="modal">
+    <div style="font-weight:bold;margin-bottom:4px;">已生成簽單</div>
+    <img id="resultImage" alt="簽單預覽" />
+    <div class="hint">
+      手機：長按圖片即可儲存或轉傳。<br>
+      電腦：可按下方按鈕下載。
+    </div>
+    <a id="downloadLink" download="dispatch-slip.png">
+      <button type="button">下載 PNG 檔</button>
+    </a>
+    <button type="button" onclick="closeModal()">關閉視窗</button>
   </div>
+</div>
 
-  <script>
-    /**
-     * 配置區 - 修改這裡可以自訂公司標題與底部聯絡方式預設值。
-     *
-     * companyHeader: 派車單上方的公司標題，例如 "甲乙租賃有限公司 派車、簽認單"
-     * phoneFooter: 底部三欄的預設文字，可在表單預設值更動；此配置主要供程式初始化
-     */
-    const CONFIG = {
-      companyHeader: "怡達租賃有限公司 ", // ← 在這裡改成你的公司標題
-    };
+<script>
+  // ======== 需要套印的位置（之後覺得跑掉，只要改這裡的數字） ========
+  const positions = {
+    companyTitle: { x: 150,  y: 80 },   // ＯＯ租賃有限公司
+    clientCompany:{ x: 200,  y: 200 },  // 客戶公司
+    dateMonth:    { x: 1180, y: 80 },   // 日期： 月
+    dateDay:      { x: 1400, y: 80 },   // 日期：   日
+    passenger:    { x: 200,  y: 300 },  // 乘客
+    phone:        { x: 600,  y: 300 },  // 電話
+    origin:       { x: 200,  y: 410 },  // 起點
+    destination:  { x: 200,  y: 500 },  // 終點
+    startTime:    { x: 1150, y: 300 },  // (開始/班機)時間（整個 HH:MM）
+    serviceSong:  { x: 1080, y: 200 },  // 送機勾選
+    serviceJie:   { x: 1240, y: 200 },  // 接機勾選
+    serviceBao:   { x: 1400, y: 200 },  // 包車勾選
+    holdSign:     { x: 840,  y: 560 },  // 「舉牌接機」勾選
+    carTypeSedan: { x: 200,  y: 650 },  // 轎車勾選
+    carTypeSUV:   { x: 360,  y: 650 },  // 休旅車勾選
+    carTypeOther: { x: 200,  y: 705 },  // 其他勾選
+    people:       { x: 600,  y: 650 },  // 人數
+    driver:       { x: 200,  y: 840 },  // 駕駛
+    carNo:        { x: 600,  y: 840 }   // 車號
+  };
 
-    // === 資料綁定函式 ===
-    function bindText(inId, outId) {
-      const input = document.getElementById(inId);
-      const out = document.getElementById(outId);
-      const sync = () => out.textContent = input.value || "";
-      input.addEventListener("input", sync);
-      sync();
+  const templateImg = document.getElementById("templateImage");
+  const form        = document.getElementById("dispatchForm");
+  const modalBack   = document.getElementById("modalBackdrop");
+  const resultImage = document.getElementById("resultImage");
+  const downloadLink= document.getElementById("downloadLink");
+
+  function openModal() {
+    modalBack.style.display = "flex";
+  }
+  function closeModal() {
+    modalBack.style.display = "none";
+  }
+  window.closeModal = closeModal; // 給 HTML onclick 用
+
+  function drawText(ctx, text, pos, size = 48, bold = true) {
+    if (!text) return;
+    ctx.font = (bold ? "bold " : "") + size + 'px "Microsoft JhengHei","Noto Sans TC",system-ui';
+    ctx.fillStyle = "#000";
+    ctx.textBaseline = "top";
+    ctx.fillText(text, pos.x, pos.y);
+  }
+
+  function drawCheck(ctx, pos, size = 48) {
+    ctx.font = "bold " + size + 'px "Microsoft JhengHei","Noto Sans TC",system-ui';
+    ctx.fillStyle = "#000";
+    ctx.textBaseline = "top";
+    ctx.fillText("✓", pos.x, pos.y);
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    if (!templateImg.complete) {
+      templateImg.onload = () => generateSlip();
+    } else {
+      generateSlip();
     }
-    // 綁定一般文字欄位
-    bindText("in-company", "f-company");
-    bindText("in-passenger", "f-passenger");
-    bindText("in-phone", "f-phone");
-    bindText("in-start", "f-start");
-    bindText("in-end", "f-end");
-    bindText("in-price", "f-price");
-    bindText("in-hours", "f-hours");
-    bindText("in-minutes", "f-minutes");
-    bindText("in-people", "f-people");
-    bindText("in-driver", "f-driver");
-    bindText("in-car-no", "f-car-no");
-    bindText("in-remark", "f-remark");
-    bindText("in-footer-tel", "f-footer-tel");
-    bindText("in-footer-fax", "f-footer-fax");
-    bindText("in-footer-mobile", "f-footer-mobile");
-    bindText("in-car-type-other", "f-car-type-other-text");
-
-    // 初始化公司標題
-    document.getElementById("f-header-title").textContent = CONFIG.companyHeader;
-
-    // 日期輸入 -> 拆成年月日顯示
-    document.getElementById("in-date").addEventListener("input", () => {
-      const v = document.getElementById("in-date").value;
-      const fm = document.getElementById("f-date-month");
-      const fd = document.getElementById("f-date-day");
-      if (!v) {
-        fy.textContent = fm.textContent = fd.textContent = "";
-        return;
-      }
-      const d = new Date(v);
-      fm.textContent = d.getMonth() + 1;
-      fd.textContent = d.getDate();
-    });
-
-    // 今日日期填入
-    function fillToday() {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const el = document.getElementById("in-date");
-      el.value = `${y}-${m}-${day}`;
-      el.dispatchEvent(new Event("input"));
-    }
-    window.fillToday = fillToday;
-
-// 時間輸入 -> 拆成時分
-function bindTime(inId, hId, mId) {
-  const input = document.getElementById(inId);
-  input.addEventListener("input", () => {
-    const v = input.value;
-    const h = document.getElementById(hId);
-    const m = document.getElementById(mId);
-    if (!v) {
-      h.textContent = m.textContent = "";
-      return;
-    }
-    const [hh, mm] = v.split(":");
-    h.textContent = hh;
-    m.textContent = mm;
   });
-}
-bindTime("in-time-start", "f-time-start-h", "f-time-start-m");
-bindTime("in-time-end", "f-time-end-h", "f-time-end-m");
 
-    // 派車種類勾選
-    function updateType() {
-      const v = document.getElementById("in-type").value;
-      document.getElementById("f-type-send").textContent    = (v === "send")    ? "V" : "";
-      document.getElementById("f-type-pick").textContent    = (v === "pick")    ? "V" : "";
-      document.getElementById("f-type-charter").textContent = (v === "charter") ? "V" : "";
-      // 如果不是包車，自動清掉包車共計時數，避免印出 0 小時 0 分
-      if (v !== "charter") {
-        const hoursInput   = document.getElementById("in-hours");
-        const minutesInput = document.getElementById("in-minutes");
-        hoursInput.value = "";
-        minutesInput.value = "";
-        document.getElementById("f-hours").textContent   = "";
-        document.getElementById("f-minutes").textContent = "";
-       }
-    }
-    document.getElementById("in-type").addEventListener("change", updateType);
-    updateType();
+  function generateSlip() {
+    const canvas = document.createElement("canvas");
+    canvas.width  = 1654; // 底圖實際尺寸
+    canvas.height = 1166;
+    const ctx = canvas.getContext("2d");
 
-    // 舉牌接機勾選
-    function updateBoard() {
-      const v = document.getElementById("in-board-sign").value;
-      document.getElementById("f-board-sign").textContent = (v === "yes") ? "V" : "";
-    }
-    document.getElementById("in-board-sign").addEventListener("change", updateBoard);
-    updateBoard();
+    // 畫上底圖
+    ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
-    // 車型勾選
-    function updateCarType() {
-      const v = document.getElementById("in-car-type").value;
-      document.getElementById("f-car-type-sedan").textContent   = (v === "sedan")  ? "V" : "";
-      document.getElementById("f-car-type-van").textContent     = (v === "van")    ? "V" : "";
-      document.getElementById("f-car-type-other-v").textContent = (v === "other")  ? "V" : "";
-    }
-    document.getElementById("in-car-type").addEventListener("change", updateCarType);
-    updateCarType();
+    // 取得表單資料
+    const companyTitle = document.getElementById("companyTitle").value.trim();
+    const clientCompany= document.getElementById("clientCompany").value.trim();
+    const dateValue    = document.getElementById("date").value;
+    const passenger    = document.getElementById("passenger").value.trim();
+    const phone        = document.getElementById("phone").value.trim();
+    const origin       = document.getElementById("origin").value.trim();
+    const destination  = document.getElementById("destination").value.trim();
+    const startTime    = document.getElementById("startTime").value;
+    const holdSign     = document.getElementById("holdSign").checked;
+    const people       = document.getElementById("people").value.trim();
+    const driver       = document.getElementById("driver").value.trim();
+    const carNo        = document.getElementById("carNo").value.trim();
 
-    // === 欄位位置存取功能 ===
-    const sheet    = document.getElementById("sheet");
-    const fields   = Array.from(sheet.querySelectorAll(".field, .field-multi"));
-    const STORE_KEY = "dispatch_field_positions_v2";
-    let editing = false;
-    let dragTarget = null;
-    let startX = 0;
-    let startY = 0;
-    let originLeft = 0;
-    let originTop = 0;
+    const serviceType  = document.querySelector('input[name="serviceType"]:checked').value;
+    const carType      = document.querySelector('input[name="carType"]:checked').value;
 
-    // 預設位置，可根據底圖微調
-    function setInitialPositions() {
-      const rect = sheet.getBoundingClientRect();
-      // helper
-      function set(id, leftPct, topPct, widthPct, heightPct) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.style.left = (leftPct * rect.width) + "px";
-        el.style.top  = (topPct  * rect.height) + "px";
-        if (typeof widthPct === 'number') {
-          el.style.width = (widthPct * rect.width) + 'px';
-        }
-        if (typeof heightPct === 'number') {
-          el.style.height = (heightPct * rect.height) + 'px';
-        }
-      }
-      // 公司標題放在最上方偏左
-      set("f-header-title", 0.05, 0.02, 0.5, 0.05);
-      // 公司名稱 (訂車公司)
-      set("f-company", 0.13, 0.19, 0.25, 0.045);
-      // 日期 月/日
-      set("f-date-month", 0.79, 0.19, 0.06, 0.045);
-      set("f-date-day", 0.88, 0.19, 0.06, 0.045);
-      // 乘客 / 電話
-      set("f-passenger", 0.13, 0.29, 0.25, 0.045);
-      set("f-phone",    0.45, 0.29, 0.25, 0.045);
-      // 派車種類勾選
-      set("f-type-send",    0.73, 0.29, 0.05, 0.045);
-      set("f-type-pick",    0.81, 0.29, 0.05, 0.045);
-      set("f-type-charter", 0.89, 0.29, 0.05, 0.045);
-      // 起點、終點、金額
-      set("f-start", 0.22, 0.40, 0.35, 0.07);
-      set("f-end",   0.22, 0.52, 0.35, 0.07);
-      set("f-price", 0.22, 0.64, 0.35, 0.07);
-      // 時間 (時/分)
-      set("f-time-start-h", 0.80, 0.40, 0.05, 0.07);
-      set("f-time-start-m", 0.88, 0.40, 0.05, 0.07);
-      set("f-time-end-h",   0.80, 0.52, 0.05, 0.07);
-      set("f-time-end-m",   0.88, 0.52, 0.05, 0.07);
-      set("f-hours",        0.80, 0.64, 0.05, 0.07);
-      set("f-minutes",      0.88, 0.64, 0.05, 0.07);
-      // 舉牌接機勾選
-      set("f-board-sign", 0.69, 0.72, 0.07, 0.05);
-      // 車型勾選
-      set("f-car-type-sedan",   0.18, 0.79, 0.07, 0.045);
-      set("f-car-type-van",     0.33, 0.79, 0.07, 0.045);
-      set("f-car-type-other-v", 0.49, 0.79, 0.07, 0.045);
-      set("f-car-type-other-text", 0.55, 0.79, 0.15, 0.045);
-      set("f-people", 0.64, 0.79, 0.08, 0.045);
-      // 駕駛 / 車號
-      set("f-driver", 0.17, 0.88, 0.30, 0.05);
-      set("f-car-no", 0.64, 0.88, 0.30, 0.05);
-      // 備註
-      set("f-remark", 0.15, 0.92, 0.60, 0.06);
-      // 底部聯絡方式
-      set("f-footer-tel",    0.17, 0.96, 0.25, 0.04);
-      set("f-footer-fax",    0.45, 0.96, 0.25, 0.04);
-      set("f-footer-mobile", 0.72, 0.96, 0.25, 0.04);
-    }
-
-    // 儲存欄位位置到 localStorage
-    function savePositions() {
-      const rect = sheet.getBoundingClientRect();
-      const data = {};
-      fields.forEach(el => {
-        const id = el.id;
-        const fr = el.getBoundingClientRect();
-        const leftPct = (fr.left - rect.left) / rect.width;
-        const topPct  = (fr.top  - rect.top ) / rect.height;
-        // 儲存寬度與高度百分比
-        const widthPct  = fr.width / rect.width;
-        const heightPct = fr.height / rect.height;
-        // 字體大小
-        const comp = window.getComputedStyle(el);
-        const fontSize = parseFloat(comp.fontSize);
-        data[id] = { leftPct, topPct, widthPct, heightPct, fontSize };
-      });
-      localStorage.setItem(STORE_KEY, JSON.stringify(data));
-    }
-
-    // 載入欄位位置
-    function loadPositions() {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      let data;
-      try { data = JSON.parse(raw); } catch(e) { return; }
-      const rect = sheet.getBoundingClientRect();
-      Object.keys(data).forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const { leftPct, topPct } = data[id];
-        el.style.left = (leftPct * rect.width) + "px";
-        el.style.top  = (topPct  * rect.height) + "px";
-        // 套用寬、高與字體大小
-        if (typeof data[id].widthPct === 'number') {
-          el.style.width  = (data[id].widthPct  * rect.width) + 'px';
-        }
-        if (typeof data[id].heightPct === 'number') {
-          el.style.height = (data[id].heightPct * rect.height) + 'px';
-        }
-        if (typeof data[id].fontSize === 'number') {
-          el.style.fontSize = data[id].fontSize + 'px';
-        }
-      });
-    }
-
-    // 啟用或停用欄位調整模式
-    function enableEditMode(on) {
-      editing = on;
-      if (editing) {
-        sheet.classList.add("editable");
-      } else {
-        sheet.classList.remove("editable");
-        savePositions();
+    // 日期處理：轉成 月 / 日
+    let monthText = "", dayText = "";
+    if (dateValue) {
+      const d = new Date(dateValue);
+      if (!isNaN(d)) {
+        monthText = String(d.getMonth() + 1);
+        dayText   = String(d.getDate());
       }
     }
 
-    // 滑鼠拖拉事件處理
-    sheet.addEventListener("mousedown", e => {
-      if (!editing) return;
-      const target = e.target;
-      if (!target.classList.contains("field") && !target.classList.contains("field-multi")) return;
-      const rect = sheet.getBoundingClientRect();
-      const fr = target.getBoundingClientRect();
-      // 判斷是否點擊在右下角用於調整尺寸
-      const offsetX = e.clientX - fr.left;
-      const offsetY = e.clientY - fr.top;
-      if (offsetX > fr.width - 16 && offsetY > fr.height - 16) {
-        // 使用者正在拖曳尺寸，不處理位置變化
-        dragTarget = null;
-        return;
-      }
-      dragTarget = target;
-      startX = e.clientX;
-      startY = e.clientY;
-      originLeft = fr.left - rect.left;
-      originTop  = fr.top  - rect.top;
-      e.preventDefault();
-    });
+    // 時間：直接畫成 HH:MM
+    let timeText = "";
+    if (startTime) {
+      timeText = startTime; // 24H HH:MM
+    }
 
-    window.addEventListener("mousemove", e => {
-      if (!editing || !dragTarget) return;
-      const rect = sheet.getBoundingClientRect();
-      let dx = e.clientX - startX;
-      let dy = e.clientY - startY;
-      let newLeft = originLeft + dx;
-      let newTop  = originTop  + dy;
-      // 限制不超出容器
-      newLeft = Math.max(0, Math.min(rect.width  - 10, newLeft));
-      newTop  = Math.max(0, Math.min(rect.height - 10, newTop));
-      dragTarget.style.left = newLeft + "px";
-      dragTarget.style.top  = newTop  + "px";
-    });
+    // ===== 實際套印文字（字體偏大） =====
+    drawText(ctx, companyTitle, positions.companyTitle, 52);
+    drawText(ctx, clientCompany, positions.clientCompany, 48);
+    drawText(ctx, monthText, positions.dateMonth, 48);
+    drawText(ctx, dayText,   positions.dateDay,   48);
 
-    window.addEventListener("mouseup", e => {
-      if (!editing) return;
-      // 如果正在拖曳，結束拖曳
-      if (dragTarget) {
-        dragTarget = null;
-      }
-      // 無論是否拖曳或調整尺寸，皆儲存位置、大小與字體
-      savePositions();
-    });
+    drawText(ctx, passenger,   positions.passenger, 46);
+    drawText(ctx, phone,       positions.phone,     46);
+    drawText(ctx, origin,      positions.origin,    46);
+    drawText(ctx, destination, positions.destination,46);
+    drawText(ctx, timeText,    positions.startTime, 42);
 
-    // 切換調整模式按鈕
-    document.getElementById("toggleEditBtn").addEventListener("click", () => {
-      enableEditMode(!editing);
-      alert(editing ? "已開啟欄位調整模式：拖曳欄位後再次點擊此按鈕即可保存。" : "已關閉欄位調整模式並保存位置。請列印或關閉提示框。" );
-    });
-    // 清除位置按鈕
-    document.getElementById("clearPosBtn").addEventListener("click", () => {
-      if (!confirm("確定要清除已儲存的欄位位置並恢復初始設定嗎？")) return;
-      localStorage.removeItem(STORE_KEY);
-      setInitialPositions();
-      savePositions();
-    });
+    if (serviceType === "song") drawCheck(ctx, positions.serviceSong, 40);
+    if (serviceType === "jie")  drawCheck(ctx, positions.serviceJie,  40);
+    if (serviceType === "bao")  drawCheck(ctx, positions.serviceBao,  40);
 
-    // 初始化：設定初步位置與載入儲存位置
-    window.addEventListener("load", () => {
-      // ① 先把日期預設成今天（等於自動幫你填年份＋月日）
-      fillToday();
+    if (holdSign) drawCheck(ctx, positions.holdSign, 40);
 
-      // ② 再處理欄位位置
-      setInitialPositions();
-      loadPositions();
+    if (carType === "sedan") drawCheck(ctx, positions.carTypeSedan, 40);
+    if (carType === "suv")   drawCheck(ctx, positions.carTypeSUV,   40);
+    if (carType === "other") drawCheck(ctx, positions.carTypeOther, 40);
 
-      // ③ 雙擊改字體大小
-      fields.forEach(el => {
-        el.addEventListener('dblclick', e => {
-          if (!editing) return;
-          // 取得當前字體大小（px）
-          const current = parseFloat(window.getComputedStyle(el).fontSize) || 11;
-          const input = prompt('輸入新的字體大小 (px)', current);
-          if (input) {
-            const newSize = parseFloat(input);
-            if (!isNaN(newSize) && newSize > 0) {
-              el.style.fontSize = newSize + 'px';
-              savePositions();
-            }
-          }
-          e.stopPropagation();
-        });
-      });
-    });
-  </script>
+    drawText(ctx, people ? people + "人" : "", positions.people, 46);
+    drawText(ctx, driver, positions.driver, 46);
+    drawText(ctx, carNo,  positions.carNo,  46);
+
+    // 匯出 PNG
+    const dataUrl = canvas.toDataURL("image/png");
+    resultImage.src   = dataUrl;
+    downloadLink.href = dataUrl;
+    openModal();
+  }
+
+  // 點背景也可以關閉
+  modalBack.addEventListener("click", function(e){
+    if (e.target === modalBack) closeModal();
+  });
+</script>
 </body>
 </html>
