@@ -80,6 +80,13 @@
     button:active{
       transform:scale(0.98);
     }
+    .hint{
+      font-size:13px;
+      color:#555;
+      margin-top:4px;
+      text-align:center;
+      line-height:1.4;
+    }
 
     /* modal */
     .modal-backdrop{
@@ -108,13 +115,6 @@
       margin-top:8px;
       background:#444;
     }
-    .hint{
-      font-size:13px;
-      color:#555;
-      margin-top:4px;
-      text-align:center;
-      line-height:1.4;
-    }
   </style>
 </head>
 <body>
@@ -124,13 +124,13 @@
   <form id="dispatchForm">
     <!-- 0. 公司抬頭 -->
     <div class="field">
-      <label for="companyTitle">公司抬頭（上方：ＯＯ租賃有限公司）</label>
+      <label for="companyTitle">公司抬頭（上方）</label>
       <input id="companyTitle" type="text" value="ＯＯ租賃有限公司" />
     </div>
 
     <!-- 1. 客戶公司 -->
     <div class="field">
-      <label for="clientCompany">客戶公司</label>
+      <label for="clientCompany">客戶公司（左上公司：）</label>
       <input id="clientCompany" type="text" placeholder="例如：○○旅行社" />
     </div>
 
@@ -138,7 +138,7 @@
     <div class="field">
       <label for="date">日期</label>
       <input id="date" type="date" />
-      <div class="hint">會自動轉成「X月X日」印在右上角</div>
+      <div class="hint">會自動轉成「X月」「X日」印在右上。</div>
     </div>
 
     <!-- 3. 送機／接機／包車 -->
@@ -155,6 +155,7 @@
     <div class="field">
       <label for="startTime">開始／班機時間（24H）</label>
       <input id="startTime" type="time" />
+      <div class="hint">會顯示成「HH時MM分」覆蓋底圖上的「時／分」。</div>
     </div>
 
     <!-- 5–8 乘客／電話／起點／終點 -->
@@ -217,12 +218,12 @@
 
     <button type="submit">生成簽單圖片</button>
     <div class="hint">
-      送出後會跳出預覽圖，手機可長按簽單圖片進行儲存或分享。
+      送出後會跳出預覽圖，手機可長按簽單圖片儲存或分享。
     </div>
   </form>
 </div>
 
-<!-- 模板底圖（不顯示，只給 Canvas 用） -->
+<!-- 底圖（給 Canvas 用，不顯示） -->
 <img id="templateImage" src="dispatch-template.jpg" alt="派車簽認單底圖" style="display:none;" />
 
 <!-- 懸浮視窗 -->
@@ -242,27 +243,27 @@
 </div>
 
 <script>
-  // ======== 需要套印的位置（之後覺得跑掉，只要改這裡的數字） ========
-  const positions = {
-    companyTitle: { x: 150,  y: 80 },   // ＯＯ租賃有限公司
-    clientCompany:{ x: 200,  y: 200 },  // 客戶公司
-    dateMonth:    { x: 1180, y: 80 },   // 日期： 月
-    dateDay:      { x: 1400, y: 80 },   // 日期：   日
-    passenger:    { x: 200,  y: 300 },  // 乘客
-    phone:        { x: 600,  y: 300 },  // 電話
-    origin:       { x: 200,  y: 410 },  // 起點
-    destination:  { x: 200,  y: 500 },  // 終點
-    startTime:    { x: 1150, y: 300 },  // (開始/班機)時間（整個 HH:MM）
-    serviceSong:  { x: 1080, y: 200 },  // 送機勾選
-    serviceJie:   { x: 1240, y: 200 },  // 接機勾選
-    serviceBao:   { x: 1400, y: 200 },  // 包車勾選
-    holdSign:     { x: 840,  y: 560 },  // 「舉牌接機」勾選
-    carTypeSedan: { x: 200,  y: 650 },  // 轎車勾選
-    carTypeSUV:   { x: 360,  y: 650 },  // 休旅車勾選
-    carTypeOther: { x: 200,  y: 705 },  // 其他勾選
-    people:       { x: 600,  y: 650 },  // 人數
-    driver:       { x: 200,  y: 840 },  // 駕駛
-    carNo:        { x: 600,  y: 840 }   // 車號
+  // === 你提供的框座標＋大小 ===
+  const boxes = {
+    companyTitle:  { x: 69,   y: 12,  w: 1201, h: 174 }, // 公司抬頭
+    clientCompany:{ x: 242,  y: 208, w: 592,  h: 134 }, // 客戶公司
+    dateMonth:    { x: 1652, y: 230, w: 130,  h: 84  }, // 日期_月
+    dateDay:      { x: 1851, y: 230, w: 123,  h: 84  }, // 日期_日
+    serviceSong:  { x: 1473, y: 366, w: 73,   h: 96  }, // ✓送機
+    serviceJie:   { x: 1660, y: 364, w: 71,   h: 101 }, // ✓接機
+    serviceBao:   { x: 1849, y: 364, w: 70,   h: 104 }, // ✓包車
+    passenger:    { x: 235,  y: 364, w: 530,  h: 130 }, // 乘客
+    phone:        { x: 952,  y: 365, w: 500,  h: 123 }, // 電話
+    startTime:    { x: 1482, y: 571, w: 517,  h: 82  }, // 開始/班機時間
+    origin:       { x: 438,  y: 516, w: 1021, h: 130 }, // 起點
+    destination:  { x: 438,  y: 669, w: 1022, h: 123 }, // 終點
+    holdSign:     { x: 1160, y: 855, w: 75,   h: 108 }, // ✓舉牌
+    carTypeSedan: { x: 257,  y: 966, w: 77,   h: 95  }, // ✓轎車
+    carTypeSUV:   { x: 471,  y: 965, w: 84,   h: 101 }, // ✓休旅車
+    carTypeOther: { x: 260,  y: 1071,w: 77,   h: 96  }, // ✓其他
+    people:       { x: 986,  y: 1012,w: 253,  h: 119 }, // 人數
+    driver:       { x: 244,  y: 1203,w: 410,  h: 101 }, // 駕駛
+    carNo:        { x: 856,  y: 1200,w: 482,  h: 104 }  // 車號
   };
 
   const templateImg = document.getElementById("templateImage");
@@ -277,28 +278,72 @@
   function closeModal() {
     modalBack.style.display = "none";
   }
-  window.closeModal = closeModal; // 給 HTML onclick 用
+  window.closeModal = closeModal;
 
-  function drawText(ctx, text, pos, size = 48, bold = true) {
+  // 自動換行＋自適應字體（全部靠左）
+  function drawAutoFitText(ctx, text, box, options = {}) {
     if (!text) return;
-    ctx.font = (bold ? "bold " : "") + size + 'px "Microsoft JhengHei","Noto Sans TC",system-ui';
+    const maxFont = options.maxFont || 48;   // 你指定：最大 48
+    const minFont = options.minFont || 20;
+    const lineHeightRatio = options.lineHeight || 1.15;
+
+    let fontSize = maxFont;
+    let lines = [];
+
+    while (fontSize >= minFont) {
+      ctx.font = `bold ${fontSize}px "Microsoft JhengHei","Noto Sans TC",system-ui`;
+      lines = [];
+      let current = "";
+
+      for (const ch of text) {
+        const test = current + ch;
+        if (ctx.measureText(test).width > box.w && current !== "") {
+          lines.push(current);
+          current = ch;
+        } else {
+          current = test;
+        }
+      }
+      if (current) lines.push(current);
+
+      const lineHeight = fontSize * lineHeightRatio;
+      const totalHeight = lines.length * lineHeight;
+
+      if (totalHeight <= box.h) break; // 這個字級塞得下
+      fontSize -= 2;
+    }
+
+    const lineHeight = fontSize * lineHeightRatio;
+    ctx.font = `bold ${fontSize}px "Microsoft JhengHei","Noto Sans TC",system-ui`;
     ctx.fillStyle = "#000";
     ctx.textBaseline = "top";
-    ctx.fillText(text, pos.x, pos.y);
+
+    let y = box.y;
+    for (const line of lines) {
+      ctx.fillText(line, box.x, y); // 全部靠左
+      y += lineHeight;
+      if (y > box.y + box.h - lineHeight) break;
+    }
   }
 
-  function drawCheck(ctx, pos, size = 48) {
-    ctx.font = "bold " + size + 'px "Microsoft JhengHei","Noto Sans TC",system-ui';
+  // 勾選框：在框內置中畫 ✓
+  function drawCheck(ctx, box) {
+    const mark = "✓";
+    const size = Math.min(box.w, box.h) * 0.9;
+    ctx.font = `bold ${size}px "Microsoft JhengHei","Noto Sans TC",system-ui`;
     ctx.fillStyle = "#000";
     ctx.textBaseline = "top";
-    ctx.fillText("✓", pos.x, pos.y);
+    const w = ctx.measureText(mark).width;
+    const x = box.x + (box.w - w) / 2;
+    const y = box.y + (box.h - size) / 2;
+    ctx.fillText(mark, x, y);
   }
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
 
     if (!templateImg.complete) {
-      templateImg.onload = () => generateSlip();
+      templateImg.onload = generateSlip;
     } else {
       generateSlip();
     }
@@ -306,14 +351,17 @@
 
   function generateSlip() {
     const canvas = document.createElement("canvas");
-    canvas.width  = 1654; // 底圖實際尺寸
-    canvas.height = 1166;
+    // 用底圖的實際尺寸當作 Canvas 尺寸
+    const w = templateImg.naturalWidth || 2000;
+    const h = templateImg.naturalHeight || 1400;
+    canvas.width  = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d");
 
     // 畫上底圖
     ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
-    // 取得表單資料
+    // 表單資料
     const companyTitle = document.getElementById("companyTitle").value.trim();
     const clientCompany= document.getElementById("clientCompany").value.trim();
     const dateValue    = document.getElementById("date").value;
@@ -321,16 +369,15 @@
     const phone        = document.getElementById("phone").value.trim();
     const origin       = document.getElementById("origin").value.trim();
     const destination  = document.getElementById("destination").value.trim();
-    const startTime    = document.getElementById("startTime").value;
+    const startTimeRaw = document.getElementById("startTime").value;
     const holdSign     = document.getElementById("holdSign").checked;
     const people       = document.getElementById("people").value.trim();
     const driver       = document.getElementById("driver").value.trim();
     const carNo        = document.getElementById("carNo").value.trim();
-
     const serviceType  = document.querySelector('input[name="serviceType"]:checked').value;
     const carType      = document.querySelector('input[name="carType"]:checked').value;
 
-    // 日期處理：轉成 月 / 日
+    // 日期：拆成月 / 日
     let monthText = "", dayText = "";
     if (dateValue) {
       const d = new Date(dateValue);
@@ -340,37 +387,48 @@
       }
     }
 
-    // 時間：直接畫成 HH:MM
-    let timeText = "";
-    if (startTime) {
-      timeText = startTime; // 24H HH:MM
+    // 時間：轉成「HH時MM分」
+    let startTimeText = "";
+    if (startTimeRaw) {
+      const parts = startTimeRaw.split(":");
+      if (parts.length === 2) {
+        const hh = parts[0];
+        const mm = parts[1];
+        startTimeText = `${hh}時${mm}分`;
+      } else {
+        startTimeText = startTimeRaw;
+      }
     }
 
-    // ===== 實際套印文字（字體偏大） =====
-    drawText(ctx, companyTitle, positions.companyTitle, 52);
-    drawText(ctx, clientCompany, positions.clientCompany, 48);
-    drawText(ctx, monthText, positions.dateMonth, 48);
-    drawText(ctx, dayText,   positions.dateDay,   48);
+    // ===== 套印文字（全部靠左，自適應字體） =====
+    drawAutoFitText(ctx, companyTitle, boxes.companyTitle);
+    drawAutoFitText(ctx, clientCompany, boxes.clientCompany);
+    drawAutoFitText(ctx, monthText, boxes.dateMonth);
+    drawAutoFitText(ctx, dayText,   boxes.dateDay);
 
-    drawText(ctx, passenger,   positions.passenger, 46);
-    drawText(ctx, phone,       positions.phone,     46);
-    drawText(ctx, origin,      positions.origin,    46);
-    drawText(ctx, destination, positions.destination,46);
-    drawText(ctx, timeText,    positions.startTime, 42);
+    drawAutoFitText(ctx, passenger,   boxes.passenger);
+    drawAutoFitText(ctx, phone,       boxes.phone);
+    drawAutoFitText(ctx, startTimeText, boxes.startTime);
+    drawAutoFitText(ctx, origin,      boxes.origin);
+    drawAutoFitText(ctx, destination, boxes.destination);
 
-    if (serviceType === "song") drawCheck(ctx, positions.serviceSong, 40);
-    if (serviceType === "jie")  drawCheck(ctx, positions.serviceJie,  40);
-    if (serviceType === "bao")  drawCheck(ctx, positions.serviceBao,  40);
+    if (people) {
+      drawAutoFitText(ctx, people + "人", boxes.people);
+    }
 
-    if (holdSign) drawCheck(ctx, positions.holdSign, 40);
+    drawAutoFitText(ctx, driver, boxes.driver);
+    drawAutoFitText(ctx, carNo,  boxes.carNo);
 
-    if (carType === "sedan") drawCheck(ctx, positions.carTypeSedan, 40);
-    if (carType === "suv")   drawCheck(ctx, positions.carTypeSUV,   40);
-    if (carType === "other") drawCheck(ctx, positions.carTypeOther, 40);
+    // 勾選
+    if (serviceType === "song") drawCheck(ctx, boxes.serviceSong);
+    if (serviceType === "jie")  drawCheck(ctx, boxes.serviceJie);
+    if (serviceType === "bao")  drawCheck(ctx, boxes.serviceBao);
 
-    drawText(ctx, people ? people + "人" : "", positions.people, 46);
-    drawText(ctx, driver, positions.driver, 46);
-    drawText(ctx, carNo,  positions.carNo,  46);
+    if (holdSign) drawCheck(ctx, boxes.holdSign);
+
+    if (carType === "sedan") drawCheck(ctx, boxes.carTypeSedan);
+    if (carType === "suv")   drawCheck(ctx, boxes.carTypeSUV);
+    if (carType === "other") drawCheck(ctx, boxes.carTypeOther);
 
     // 匯出 PNG
     const dataUrl = canvas.toDataURL("image/png");
@@ -379,7 +437,7 @@
     openModal();
   }
 
-  // 點背景也可以關閉
+  // 點背景也可關閉
   modalBack.addEventListener("click", function(e){
     if (e.target === modalBack) closeModal();
   });
